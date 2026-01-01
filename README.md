@@ -10,4 +10,4 @@ swift ./script.swift
 
 ## Credit
 
-Logic for this script was adapted from the [OverSight project](https://github.com/objective-see/OverSight). For a more security oriented solution to this, see that application. This is a bit more lightweight version of what that application does
+Logic for this script was adapted from the [OverSight project](https://github.com/objective-see/OverSight). For a more security oriented solution to this, see that application. This is a bit more lightweight, "in the background" version of that
