@@ -6,6 +6,23 @@ import CoreMediaIO
 import CoreAudio
 import ObjectiveC
 
+// Parse command line arguments
+var verboseArg = false
+for argument in CommandLine.arguments {
+    if argument == "--verbose" {
+        verboseArg = true
+        break
+    }
+}
+
+// Logging function: always prints errors and "starting..." messages, respects verbose flag for others
+func log(_ message: String, verbose: Bool = false) {
+    if (verbose && !verboseArg) {
+        return
+    }
+    print(message)
+}
+
 // Store listener blocks to keep them alive
 var listenerBlocks: [String: CMIOObjectPropertyListenerBlock] = [:]
 
@@ -76,11 +93,11 @@ func getCameraState(_ deviceID: CMIOObjectID) -> UInt32 {
 // Monitor a camera device
 func monitorCamera(_ device: AVCaptureDevice) {
     guard let deviceID = getDeviceID(device) else {
-        print("ERROR: Failed to get device ID for \(device.localizedName)")
+        log("ERROR: Failed to get device ID for \(device.localizedName)")
         return
     }
     
-    print("Monitoring camera: \(device.localizedName) (ID: \(deviceID))")
+    log("Monitoring camera: \(device.localizedName) (ID: \(deviceID))", verbose: true)
     
     var propertyStruct = CMIOObjectPropertyAddress(
         mSelector: CMIOObjectPropertySelector(kAudioDevicePropertyDeviceIsRunningSomewhere),
@@ -111,9 +128,9 @@ func monitorCamera(_ device: AVCaptureDevice) {
         // Only print if state changed
         if currentState != stateTracker.previousState {
             if currentState != 0 {
-                print("📸 Camera CONNECTED: \(stateTracker.deviceName)")
+                log("Connected: \"\(stateTracker.deviceName)\" (ID: \(deviceID))")
             } else {
-                print("📸 Camera DISCONNECTED: \(stateTracker.deviceName)")
+                log("Disconnected: \"\(stateTracker.deviceName)\" (ID: \(deviceID))")
             }
             stateTracker.previousState = currentState
         }
@@ -123,7 +140,7 @@ func monitorCamera(_ device: AVCaptureDevice) {
     let status = CMIOObjectAddPropertyListenerBlock(deviceID, &propertyStruct, queue, listenerBlock)
     
     if status != noErr {
-        print("ERROR: Failed to register listener for \(device.localizedName) (error: \(status))")
+        log("ERROR: Failed to register listener for \(device.localizedName) (error: \(status))")
         return
     }
     
@@ -136,8 +153,7 @@ func startMonitoring() {
     // Enable camera access first
     enableCameraAccess()
     
-    print("Starting camera monitoring...")
-    print("Press Ctrl+C to stop\n")
+    log("Starting camera monitoring...")
     
     // Note: Camera permission may be required, but we'll proceed anyway
     // The system will prompt if needed
@@ -155,7 +171,7 @@ func continueMonitoring() {
     let videoDevices = discoverySession.devices
     
     if videoDevices.isEmpty {
-        print("No cameras found")
+        log("No cameras found")
         return
     }
     
@@ -176,7 +192,7 @@ func continueMonitoring() {
         queue: .main
     ) { notification in
         if let device = notification.object as? AVCaptureDevice {
-            print("New camera connected: \(device.localizedName)")
+            log("New camera connected: \(device.localizedName)")
             monitorCamera(device)
         }
     }
@@ -187,7 +203,7 @@ func continueMonitoring() {
         queue: .main
     ) { notification in
         if let device = notification.object as? AVCaptureDevice {
-            print("Camera disconnected: \(device.localizedName)")
+            log("Camera disconnected: \(device.localizedName)")
         }
     }
     
