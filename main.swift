@@ -8,10 +8,18 @@ import ObjectiveC
 
 // Parse command line arguments
 var verboseArg = false
-for argument in CommandLine.arguments {
-    if argument == "--verbose" {
+var executablePath: String? = nil
+
+var args = CommandLine.arguments
+var i = 1 // Skip script name
+while i < args.count {
+    if args[i] == "--verbose" {
         verboseArg = true
-        break
+        i += 1
+    } else {
+        // Treat remaining argument as executable path
+        executablePath = args[i]
+        i += 1
     }
 }
 
@@ -21,6 +29,24 @@ func log(_ message: String, verbose: Bool = false) {
         return
     }
     print(message)
+}
+
+// Execute the provided script with connection state parameter and device ID
+func executeScript(state: String, deviceID: CMIOObjectID) {
+    guard let executablePath = executablePath else {
+        return
+    }
+    
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executablePath)
+    process.arguments = [state, String(deviceID)]
+    
+    do {
+        try process.run()
+        log("Executed: \(executablePath) \(state) \(deviceID)", verbose: true)
+    } catch {
+        log("ERROR: Failed to execute \(executablePath): \(error.localizedDescription)")
+    }
 }
 
 // Store listener blocks to keep them alive
@@ -129,8 +155,10 @@ func monitorCamera(_ device: AVCaptureDevice) {
         if currentState != stateTracker.previousState {
             if currentState != 0 {
                 log("Connected: \"\(stateTracker.deviceName)\" (ID: \(deviceID))")
+                executeScript(state: "connected", deviceID: deviceID)
             } else {
                 log("Disconnected: \"\(stateTracker.deviceName)\" (ID: \(deviceID))")
+                executeScript(state: "disconnected", deviceID: deviceID)
             }
             stateTracker.previousState = currentState
         }
