@@ -6,7 +6,7 @@ import CoreMediaIO
 import CoreAudio
 import ObjectiveC
 
-// Parse command line arguments
+// Command line arguments
 var verboseArg = false
 var executablePath: String? = nil
 
@@ -17,13 +17,12 @@ while i < args.count {
         verboseArg = true
         i += 1
     } else {
-        // Treat remaining argument as executable path
+        // Positional arguments correlate to the executable path
         executablePath = args[i]
         i += 1
     }
 }
 
-// Logging function: always prints errors and "starting..." messages, respects verbose flag for others
 func log(_ message: String, verbose: Bool = false) {
     if (verbose && !verboseArg) {
         return
@@ -52,7 +51,6 @@ func executeScript(state: String, deviceID: CMIOObjectID) {
 // Store listener blocks to keep them alive
 var listenerBlocks: [String: CMIOObjectPropertyListenerBlock] = [:]
 
-// Enable access to camera devices
 func enableCameraAccess() {
     var allowScreenCapture: UInt32 = 1
     let dataSize: UInt32 = UInt32(MemoryLayout<UInt32>.size)
@@ -65,7 +63,6 @@ func enableCameraAccess() {
     CMIOObjectSetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &propertyAddress, 0, nil, dataSize, &allowScreenCapture)
 }
 
-// Get device ID from AVCaptureDevice using Objective-C runtime
 func getDeviceID(_ device: AVCaptureDevice) -> CMIOObjectID? {
     let selector = NSSelectorFromString("connectionID")
     guard device.responds(to: selector) else {
@@ -78,17 +75,13 @@ func getDeviceID(_ device: AVCaptureDevice) -> CMIOObjectID? {
     guard let method = class_getMethodImplementation(type(of: device), selector) else {
         return nil
     }
-    
-    // Cast to the correct function signature
+
     let imp = unsafeBitCast(method, to: ConnectionIDMethod.self)
-    
-    // Call the method directly
     let connectionID = imp(device, selector)
     
     return CMIOObjectID(connectionID)
 }
 
-// Check if camera is running
 func getCameraState(_ deviceID: CMIOObjectID) -> UInt32 {
     var isRunning: UInt32 = 0
     var propertySize: UInt32 = UInt32(MemoryLayout<UInt32>.size)
@@ -116,7 +109,6 @@ func getCameraState(_ deviceID: CMIOObjectID) -> UInt32 {
     return isRunning
 }
 
-// Monitor a camera device
 func monitorCamera(_ device: AVCaptureDevice) {
     guard let deviceID = getDeviceID(device) else {
         log("ERROR: Failed to get device ID for \(device.localizedName)")
@@ -147,11 +139,9 @@ func monitorCamera(_ device: AVCaptureDevice) {
     
     let stateTracker = StateTracker(initialState: getCameraState(deviceID), deviceName: device.localizedName)
     
-    // Listener block
     let listenerBlock: CMIOObjectPropertyListenerBlock = { (inNumberAddresses, addresses) in
         let currentState = getCameraState(deviceID)
         
-        // Only print if state changed
         if currentState != stateTracker.previousState {
             if currentState != 0 {
                 log("Connected: \"\(stateTracker.deviceName)\" (ID: \(deviceID))")
@@ -164,7 +154,6 @@ func monitorCamera(_ device: AVCaptureDevice) {
         }
     }
     
-    // Register the listener
     let status = CMIOObjectAddPropertyListenerBlock(deviceID, &propertyStruct, queue, listenerBlock)
     
     if status != noErr {
@@ -176,26 +165,17 @@ func monitorCamera(_ device: AVCaptureDevice) {
     listenerBlocks[device.uniqueID] = listenerBlock
 }
 
-// Main monitoring function
 func startMonitoring() {
-    // Enable camera access first
     enableCameraAccess()
     
     log("Starting camera monitoring...")
     
-    // Note: Camera permission may be required, but we'll proceed anyway
-    // The system will prompt if needed
-    continueMonitoring()
-}
-
-func continueMonitoring() {
     // Get all video devices
     let discoverySession = AVCaptureDevice.DiscoverySession(
         deviceTypes: [.builtInWideAngleCamera, .externalUnknown],
         mediaType: .video,
         position: .unspecified
     )
-    
     let videoDevices = discoverySession.devices
     
     if videoDevices.isEmpty {
@@ -203,7 +183,6 @@ func continueMonitoring() {
         return
     }
     
-    // Monitor each camera
     for device in videoDevices {
         // Skip virtual devices
         if device.localizedName.contains("Virtual") {
@@ -213,7 +192,7 @@ func continueMonitoring() {
         monitorCamera(device)
     }
     
-    // Also monitor for new devices
+    // Monitor for new/removed devices
     NotificationCenter.default.addObserver(
         forName: AVCaptureDevice.wasConnectedNotification,
         object: nil,
@@ -224,7 +203,6 @@ func continueMonitoring() {
             monitorCamera(device)
         }
     }
-    
     NotificationCenter.default.addObserver(
         forName: AVCaptureDevice.wasDisconnectedNotification,
         object: nil,
@@ -239,6 +217,5 @@ func continueMonitoring() {
     RunLoop.main.run()
 }
 
-// Start monitoring
 startMonitoring()
 
